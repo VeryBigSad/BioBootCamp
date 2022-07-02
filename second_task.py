@@ -65,8 +65,8 @@ def calculate_chance(letter_string: str, is_cpg: bool, base: Decimal = 1) -> Dec
 
 
 # первый цикл, в котором мы ищем CpGi
+index = letters.find('CG')
 while True:
-    index = letters.find('CG')
     current_chain_length = 100
     peak_s = 0
     end = False
@@ -80,13 +80,15 @@ while True:
         cg_count = island_letters.count('CG')
         expected_to_real_cpg_relation = cg_count * current_chain_length / c_count / g_count
 
+        # print(g_count + c_count, current_chain_length * .55)
+        # print(expected_to_real_cpg_relation)
+        print(f'index: {index}, длина рассматриваемого CpG островка: {current_chain_length}')
         if not (g_count + c_count > current_chain_length * .55 and expected_to_real_cpg_relation > 0.65):
             if current_chain_length > 100:
                 current_chain_length -= 8
                 end = True
             else:
                 break
-
         # Оптимизация - вместо подсчета всего шанса с нуля каждый раз, если мы можем - мы используем последний шанс и
         #  умножаем его на шансы новых нуклеотидов
         if last_data == (None, None):
