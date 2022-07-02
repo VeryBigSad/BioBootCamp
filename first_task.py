@@ -1,13 +1,11 @@
 from decimal import *
 from math import log10
 
-# ставим глобаный пресижен для работы с floating point numbers и открываем файл с нуклеотидными последовательностями
 getcontext().prec = 60000
 
-PATH_TO_DATA_FILE = 'data/hg38_chr1_and_chr2.fa'  # путь к файлу с двумя хромосомами
+SEQUENCE_PATH = 'data/generated_sequence.fa'
 
-# получаем нуклеотиды второй хромосомы 10000000-10100000
-letters = ''.join(open(PATH_TO_DATA_FILE, 'r').read().split('\n')).split('>chr2')[1][10000000:10100000]
+nucleotides = ''.join(open(SEQUENCE_PATH, 'r').read().split('\n'))
 
 # * A C G T
 # A .......
@@ -15,123 +13,63 @@ letters = ''.join(open(PATH_TO_DATA_FILE, 'r').read().split('\n')).split('>chr2'
 # G .......
 # T .......
 matrix_helper_dict = {'A': 0, 'C': 1, 'G': 2, 'T': 3}
-
-# матрицы переходов для CGi и non-CGi, полученные через 1 хромосому
 CpG_matrix = [
-    [.188, .273, .426, .112],
-    [.158, .366, .283, .191],
-    [.162, .351, .365, .121],
-    [.087, .366, .356, .087]
+    [.180, .274, .426, .120],
+    [.171, .368, .274, .188],
+    [.161, .339, .375, .125],
+    [.079, .355, .384, .182]
 ]
 non_CpG_matrix = [
-    [.323, .174, .248, .253],
-    [.347, .263, .047, .341],
-    [.284, .212, .263, .239],
-    [.214, .207, .254, .325]
+    [.300, .205, .285, .210],
+    [.322, .298, .078, .302],
+    [.248, .246, .298, .208],
+    [.177, .239, .292, .292]
 ]
-
-
-def write_answer_down(start_index, length, s_x):
-    # функция для записи верных ответов в файл
-    if s_x < 0 or length < 200:
-        return
-    res_file = open('result.txt', 'a')
-    res_file.write(
-        'index: ' + str(10000000 + start_index) +
-        ', S(x): ' + str(s_x) +
-        ', length: ' + str(length) + '\n'
-    )
 
 
 def get_matrix_chance(first_letter, second_letter, matrix) -> Decimal:
-    # Возвращает шанс перехода для двух нуклеотидов в определенной матрице переходов
-    first_index = matrix_helper_dict[first_letter.upper()]
-    second_index = matrix_helper_dict[second_letter.upper()]
+    # возвращает шанс из матрицы для двух нуклеотидов
+    first_index = matrix_helper_dict[first_letter]
+    second_index = matrix_helper_dict[second_letter]
     return Decimal(matrix[first_index][second_index])
 
 
-def calculate_chance(letter_string: str, is_cpg: bool, base: Decimal = 1) -> Decimal:
-    # Вспомогательная функция для поиска соотношения правдоподобия
-    chance = Decimal(base)
+def calculate_chance(letter_string: str, is_cpg: bool) -> Decimal:
+    # вспомогательная функция при подсчете S(x)
+    chance = Decimal(1)
     pair_index = 0
-    while pair_index + 1 < len(letter_string):
+    while pair_index + 2 < len(letter_string):
         first_letter = letter_string[pair_index:pair_index + 2][0]
         second_letter = letter_string[pair_index:pair_index + 2][1]
         chance *= get_matrix_chance(first_letter, second_letter, CpG_matrix if is_cpg else non_CpG_matrix)
-        if second_letter.upper() == 'N' or first_letter.upper() == 'N':
-            chance = 1
         pair_index += 1
     return chance
 
 
-# первый цикл, в котором мы ищем CpGi
+answer_list = []
+index = nucleotides.find('CG')
 while True:
-    index = letters.find('CG')
-    current_chain_length = 100
-    peak_s = 0
-    end = False
-    last_data = (None, None)
+    our_nucleotides = nucleotides[index:index + 300]
+    g_count = our_nucleotides.count('G')
+    c_count = our_nucleotides.count('C')
+    if g_count + c_count > 150:
+        cg_count = our_nucleotides.count('CG')
+        number = cg_count * 300 / c_count / g_count
+        if number > 0.6:
+            # correct number
+            cpg_chance = calculate_chance(our_nucleotides, is_cpg=True)
+            non_cpg_chance = calculate_chance(our_nucleotides, is_cpg=False)
+            s = log10(cpg_chance / non_cpg_chance)
+            if s < 0:
+                index += 300
+                continue
+            answer_list.append((index, s))
+            index += 300
 
-    # Второй цикл, в котором мы ищем их продолжительность
-    while True:
-        island_letters = letters[index:index + current_chain_length].upper()
-        c_count = island_letters.count('C')
-        g_count = island_letters.count('G')
-        cg_count = island_letters.count('CG')
-        expected_to_real_cpg_relation = cg_count * current_chain_length / c_count / g_count
-
-        if not (g_count + c_count > current_chain_length * .55 and expected_to_real_cpg_relation > 0.65):
-            if current_chain_length > 100:
-                current_chain_length -= 8
-                end = True
-            else:
-                break
-
-        # Оптимизация - вместо подсчета всего шанса с нуля каждый раз, если мы можем - мы используем последний шанс и
-        #  умножаем его на шансы новых нуклеотидов
-        if last_data == (None, None):
-            cpg_chance = calculate_chance(island_letters, is_cpg=True)
-            non_cpg_chance = calculate_chance(island_letters, is_cpg=False)
-        else:
-            cpg_chance = calculate_chance(island_letters[-9:], base=last_data[0], is_cpg=True)
-            non_cpg_chance = calculate_chance(island_letters[-9:], base=last_data[1], is_cpg=False)
-        last_data = (cpg_chance, non_cpg_chance)
-
-        # s - соотношения правдоподобия
-        s = log10(cpg_chance / non_cpg_chance)
-        if s < 0:
-            if current_chain_length > 100:
-                # Сломалось не с первой попытки, т.е. раньше были успешные попытки
-                current_chain_length -= 8
-                end = True
-            else:
-                # Сломалось с первой попытки, игнорируем
-                index += current_chain_length
-                break
-
-        # для дебага, чтобы было видно что программа что-то делает
-        # print(index, s, current_chain_length)
-
-        if peak_s * .7 > s and peak_s != 0:
-            # S(x) упало на 30% или больше относительно максимума (для этого островка), значит островок закончился
-            write_answer_down(index, current_chain_length, s)
-            index += current_chain_length
-            break
-
-        if end:
-            # По какому-то из критериев островок закончился
-            write_answer_down(index, current_chain_length, s)
-            index += current_chain_length
-            break
-        else:
-            # Островок еще не закончился, идем дальше
-            peak_s = s if s > peak_s else peak_s
-            current_chain_length += 8
-            continue
-
-    # Ищем следующий возможный островок
-    index = letters.find('CG', index + 1)
+    index = nucleotides.find('CG', index + 1)
     if index == -1:
-        # Таких возможных островков нет, заканчиваем программу
         break
 
+# записываем результаты в файл
+res_file = open('result.txt', 'w')
+res_file.write('\n'.join([str('index: ' + str(i[0]) + ', S(x): ' + str(i[1])) for i in answer_list]))
