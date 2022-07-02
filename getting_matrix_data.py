@@ -13,7 +13,7 @@ text = ''.join(text).split('>chr2')[0]
 cpg_start_end_data = pd.read_csv(CPG_ISLAND_CHR1_DATA_FILEPATH, sep='\t')
 list_of_CpG_tuples: List[Tuple[int, int]] = []
 best_diff = 999999
-for i in range(cpg_start_end_data.shape[0]):
+for i in range(cpg_start_end_data.shape[0] - 1):
     diff = cpg_start_end_data['chromStart'][i + 1] - cpg_start_end_data['chromEnd'][i]
     if diff < best_diff:
         best_diff = diff
