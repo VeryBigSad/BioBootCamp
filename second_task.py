@@ -80,8 +80,6 @@ while True:
         cg_count = island_letters.count('CG')
         expected_to_real_cpg_relation = cg_count * current_chain_length / c_count / g_count
 
-        # print(g_count + c_count, current_chain_length * .55)
-        # print(expected_to_real_cpg_relation)
         print(f'index: {index}, длина рассматриваемого CpG островка: {current_chain_length}')
         if not (g_count + c_count > current_chain_length * .55 and expected_to_real_cpg_relation > 0.65):
             if current_chain_length > 100:
